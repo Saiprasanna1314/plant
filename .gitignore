@@ -1,0 +1,13 @@
+# Ignore virtual environment
+venv/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore large model files if needed
+*.h5
+
+# System files
+.DS_Store
+Thumbs.db
