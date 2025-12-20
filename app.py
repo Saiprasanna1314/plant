@@ -5,13 +5,13 @@ from flask import Flask, render_template, request
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
+# Path to your model (must be in project root)
 MODEL_PATH = os.path.join(os.getcwd(), "plantvillage_cnn_64.h5")
-DATASET_DIR = r"C:\Users\sama\Documents\dataset\archive\plantvillage dataset\plantvillage_dataset_extracted\plantvillage dataset\color"
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 IMG_SIZE = (64, 64)
 
-CONFIDENCE_THRESHOLD = 0.7   # disease confidence
-GREEN_THRESHOLD = 0.02       # plant detection
+CONFIDENCE_THRESHOLD = 0.7   # disease confidence threshold
+GREEN_THRESHOLD = 0.02       # plant detection threshold
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -20,10 +20,20 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Load model
 model = load_model(MODEL_PATH)
 
-# Class labels
+# Hardcoded class labels (replace with all your model's classes)
 labels = [
-    d for d in sorted(os.listdir(DATASET_DIR))
-    if os.path.isdir(os.path.join(DATASET_DIR, d))
+    "Apple___Apple_scab",
+    "Apple___Black_rot",
+    "Apple___Cedar_apple_rust",
+    "Apple___healthy",
+    "Blueberry___healthy",
+    "Cherry_(including_sour)___Powdery_mildew",
+    "Cherry_(including_sour)___healthy",
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+    "Corn_(maize)___Common_rust_",
+    "Corn_(maize)___Northern_Leaf_Blight",
+    "Corn_(maize)___healthy",
+    # Add all other classes from your model
 ]
 
 # 🌿 Plant (green) check
@@ -43,7 +53,6 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-
     if 'file' not in request.files:
         return "No file uploaded", 400
 
@@ -51,7 +60,7 @@ def predict():
     if f.filename == '':
         return "No file selected", 400
 
-    # Save image
+    # Save uploaded image
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], f.filename)
     f.save(save_path)
 
