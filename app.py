@@ -10,8 +10,8 @@ MODEL_PATH = os.path.join(os.getcwd(), "plantvillage_cnn_64.h5")
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 IMG_SIZE = (64, 64)
 
-CONFIDENCE_THRESHOLD = 0.7  # disease confidence
-GREEN_THRESHOLD = 0.02      # plant detection
+CONFIDENCE_THRESHOLD = 0.7   # Disease confidence threshold
+GREEN_THRESHOLD = 0.02       # Plant detection threshold
 
 # ---------------- APP ----------------
 app = Flask(__name__)
@@ -20,11 +20,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ---------------- LOAD MODEL ----------------
 model = load_model(MODEL_PATH)
-
-# Warm-up (prevents Render timeout)
+# Warm-up the model to avoid first-request delay
 model.predict(np.zeros((1, 64, 64, 3)))
 
-# ---------------- LABELS (FULL PLANTVILLAGE) ----------------
+# ---------------- LABELS (FULL PLANTVILLAGE 38 CLASSES) ----------------
 labels = [
     "Apple___Apple_scab",
     "Apple___Black_rot",
@@ -33,7 +32,7 @@ labels = [
     "Blueberry___healthy",
     "Cherry_(including_sour)___Powdery_mildew",
     "Cherry_(including_sour)___healthy",
-    "Corn_(maize)___Cercospora_leaf_spot_Gray_leaf_spot",
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
     "Corn_(maize)___Common_rust_",
     "Corn_(maize)___Northern_Leaf_Blight",
     "Corn_(maize)___healthy",
@@ -59,13 +58,12 @@ labels = [
     "Tomato___Late_blight",
     "Tomato___Leaf_Mold",
     "Tomato___Septoria_leaf_spot",
-    "Tomato___Spider_mites_Two-spotted_spider_mite",
+    "Tomato___Spider_mites Two-spotted_spider_mite",
     "Tomato___Target_Spot",
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
     "Tomato___Tomato_mosaic_virus",
     "Tomato___healthy"
 ]
-
 
 # ---------------- PLANT CHECK ----------------
 def is_plant_image(img_array):
@@ -88,38 +86,35 @@ def predict():
     if file.filename == "":
         return render_template("index.html", prediction="No file selected")
 
-    # Save image
+    # Save uploaded image
     path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(path)
 
-    # Load and preprocess
+    # Preprocess image
     img = load_img(path, target_size=IMG_SIZE)
     arr_raw = img_to_array(img) / 255.0
 
-    # STEP 1: plant check
+    # STEP 1: Plant check
     if not is_plant_image(arr_raw):
         return render_template("index.html", prediction="Not a plant image", img_path=path)
 
-    # STEP 2: predict
+    # STEP 2: Model prediction
     preds = model.predict(np.expand_dims(arr_raw, axis=0))[0]
     idx = int(np.argmax(preds))
     prob = float(preds[idx])
 
-    # STEP 3: label & confidence note
-    if idx >= len(labels):
+    # STEP 3: Confidence & safe label mapping
+    if prob < CONFIDENCE_THRESHOLD:
+        label = "Plant detected, disease not confident"
+    elif idx >= len(labels):
         label = "Unknown plant disease"
     else:
         label = labels[idx]
-
-    note = ""
-    if prob < CONFIDENCE_THRESHOLD:
-        note = "⚠️ Low confidence – prediction may be inaccurate"
 
     return render_template(
         "index.html",
         prediction=label,
         confidence=f"{prob*100:.2f}%",
-        note=note,
         img_path=path
     )
 
