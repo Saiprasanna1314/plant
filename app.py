@@ -10,8 +10,8 @@ MODEL_PATH = os.path.join(os.getcwd(), "plantvillage_cnn_64.h5")
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 IMG_SIZE = (64, 64)
 
-CONFIDENCE_THRESHOLD = 0.7
-GREEN_THRESHOLD = 0.02
+CONFIDENCE_THRESHOLD = 0.7  # disease confidence
+GREEN_THRESHOLD = 0.02      # plant detection
 
 # ---------------- APP ----------------
 app = Flask(__name__)
@@ -80,7 +80,6 @@ def index():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-
     if "file" not in request.files:
         return render_template("index.html", prediction="No file uploaded")
 
@@ -88,9 +87,11 @@ def predict():
     if file.filename == "":
         return render_template("index.html", prediction="No file selected")
 
+    # Save image
     path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(path)
 
+    # Load and preprocess
     img = load_img(path, target_size=IMG_SIZE)
     arr_raw = img_to_array(img) / 255.0
 
@@ -103,18 +104,21 @@ def predict():
     idx = int(np.argmax(preds))
     prob = float(preds[idx])
 
-    # STEP 3: safe label mapping
-    if prob < CONFIDENCE_THRESHOLD:
-        label = "Plant detected, disease not confident"
-    elif idx >= len(labels):
+    # STEP 3: label & confidence note
+    if idx >= len(labels):
         label = "Unknown plant disease"
     else:
         label = labels[idx]
+
+    note = ""
+    if prob < CONFIDENCE_THRESHOLD:
+        note = "⚠️ Low confidence – prediction may be inaccurate"
 
     return render_template(
         "index.html",
         prediction=label,
         confidence=f"{prob*100:.2f}%",
+        note=note,
         img_path=path
     )
 
