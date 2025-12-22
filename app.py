@@ -1,4 +1,3 @@
-# app.py
 import os
 import numpy as np
 from flask import Flask, render_template, request
@@ -10,8 +9,8 @@ MODEL_PATH = os.path.join(os.getcwd(), "plantvillage_cnn_64.h5")
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 IMG_SIZE = (64, 64)
 
-CONFIDENCE_THRESHOLD = 0.7   # Disease confidence threshold
-GREEN_THRESHOLD = 0.02       # Plant detection threshold
+CONFIDENCE_THRESHOLD = 0.7
+GREEN_THRESHOLD = 0.02
 
 # ---------------- APP ----------------
 app = Flask(__name__)
@@ -20,10 +19,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ---------------- LOAD MODEL ----------------
 model = load_model(MODEL_PATH)
-# Warm-up the model to avoid first-request delay
+
+# 🔥 Warm-up model (prevents Render timeout)
 model.predict(np.zeros((1, 64, 64, 3)))
 
-# ---------------- LABELS (FULL PLANTVILLAGE 38 CLASSES) ----------------
+# ---------------- PLANTVILLAGE LABELS (37 CLASSES) ----------------
 labels = [
     "Apple___Apple_scab",
     "Apple___Black_rot",
@@ -79,6 +79,7 @@ def index():
 
 @app.route("/predict", methods=["POST"])
 def predict():
+
     if "file" not in request.files:
         return render_template("index.html", prediction="No file uploaded")
 
@@ -86,35 +87,44 @@ def predict():
     if file.filename == "":
         return render_template("index.html", prediction="No file selected")
 
-    # Save uploaded image
+    # Save image
     path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(path)
 
-    # Preprocess image
+    # Load image
     img = load_img(path, target_size=IMG_SIZE)
     arr_raw = img_to_array(img) / 255.0
 
-    # STEP 1: Plant check
+    # STEP 1: Non-plant check
     if not is_plant_image(arr_raw):
-        return render_template("index.html", prediction="Not a plant image", img_path=path)
+        return render_template(
+            "index.html",
+            prediction="Not a plant image ❌",
+            img_path=path
+        )
 
-    # STEP 2: Model prediction
+    # STEP 2: Prediction
     preds = model.predict(np.expand_dims(arr_raw, axis=0))[0]
     idx = int(np.argmax(preds))
     prob = float(preds[idx])
 
-    # STEP 3: Confidence & safe label mapping
-    if prob < CONFIDENCE_THRESHOLD:
-        label = "Plant detected, disease not confident"
-    elif idx >= len(labels):
-        label = "Unknown plant disease"
+    # STEP 3: Safe label handling
+    if idx >= len(labels):
+        final_label = "Unknown plant condition"
     else:
         label = labels[idx]
 
+        if "healthy" in label.lower():
+            final_label = "Healthy plant 🌱"
+        elif prob < CONFIDENCE_THRESHOLD:
+            final_label = "Disease detected but not confident ⚠"
+        else:
+            final_label = label.replace("___", " → ")
+
     return render_template(
         "index.html",
-        prediction=label,
-        confidence=f"{prob*100:.2f}%",
+        prediction=final_label,
+        confidence=f"{prob * 100:.2f}%",
         img_path=path
     )
 
